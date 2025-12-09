@@ -1,0 +1,337 @@
+import React, { useState } from 'react';
+import { InvoiceData, LineItem, TemplateStyle } from '../types';
+import { Plus, Trash2, Upload, Loader2, Sparkles, Printer, Copy, Share2, Mail, MessageCircle, Download, FileText, Settings, Save } from 'lucide-react';
+
+interface Props {
+  data: InvoiceData;
+  setData: React.Dispatch<React.SetStateAction<InvoiceData>>;
+  selectedTemplate: TemplateStyle;
+  setTemplate: (t: TemplateStyle) => void;
+  onImageUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  isAnalyzing: boolean;
+  onPrint: () => void;
+  onDownloadPDF: () => void;
+  onSaveSettings: () => void;
+}
+
+export const InvoiceForm: React.FC<Props> = ({ 
+  data, setData, selectedTemplate, setTemplate, onImageUpload, isAnalyzing, onPrint, onDownloadPDF, onSaveSettings
+}) => {
+  
+  const [showSettings, setShowSettings] = useState(false);
+
+  const handleCompanyChange = (field: string, value: string) => {
+    setData(prev => ({ ...prev, company: { ...prev.company, [field]: value } }));
+  };
+
+  const handleClientChange = (field: string, value: string) => {
+    setData(prev => ({ ...prev, client: { ...prev.client, [field]: value } }));
+  };
+
+  const handleDetailsChange = (field: string, value: string) => {
+    setData(prev => ({ ...prev, details: { ...prev.details, [field]: value } }));
+  };
+
+  const updateItem = (index: number, field: keyof LineItem, value: string | number) => {
+    const newItems = [...data.items];
+    newItems[index] = { ...newItems[index], [field]: value };
+    setData(prev => ({ ...prev, items: newItems }));
+  };
+
+  const addItem = () => {
+    setData(prev => ({
+      ...prev,
+      items: [
+        ...prev.items,
+        { id: Math.random().toString(), description: 'New Item', hsn: '', quantity: 1, price: 0, gstRate: 18 }
+      ]
+    }));
+  };
+
+  const duplicateItem = (index: number) => {
+    const itemToCopy = data.items[index];
+    const newItem = { ...itemToCopy, id: Math.random().toString() };
+    const newItems = [...data.items];
+    newItems.splice(index + 1, 0, newItem);
+    setData(prev => ({ ...prev, items: newItems }));
+  };
+
+  const removeItem = (index: number) => {
+    setData(prev => ({
+      ...prev,
+      items: prev.items.filter((_, i) => i !== index)
+    }));
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, field: 'logoUrl' | 'signatureUrl' | 'sealUrl') => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        handleCompanyChange(field, reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const shareViaWhatsApp = () => {
+    const text = `*${data.details.documentTitle}*\nFrom: ${data.company.name}\nTo: ${data.client.companyName || data.client.name}\nInvoice No: ${data.details.number}\n\n*Total Amount: ₹${data.items.reduce((acc, item) => acc + (item.quantity * item.price) + ((item.quantity * item.price * item.gstRate)/100), 0).toFixed(2)}*\n\n(Please download the attached PDF for full details)`;
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+  };
+
+  const shareViaEmail = () => {
+    const subject = `${data.details.documentTitle} - ${data.details.number} from ${data.company.name}`;
+    const body = `Dear Customer,\n\nPlease find attached the ${data.details.documentTitle} details.\n\nDocument Number: ${data.details.number}\nTotal Amount: ₹${data.items.reduce((acc, item) => acc + (item.quantity * item.price) + ((item.quantity * item.price * item.gstRate)/100), 0).toFixed(2)}\n\n(Please attach the downloaded PDF manually)\n\nThank you,\n${data.company.name}`;
+    window.location.href = `mailto:${data.client.email || ''}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  };
+
+  return (
+    <div className="h-full p-6 bg-slate-50 border-r border-slate-200 relative">
+      
+      {/* Settings Modal Overlay */}
+      {showSettings && (
+        <div className="absolute inset-0 z-50 bg-slate-900/50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+            <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+              <Settings className="w-5 h-5 text-indigo-600" /> Default Settings
+            </h3>
+            <p className="text-sm text-slate-500 mb-4">
+              Clicking "Save Defaults" will save the current <strong>Company Details (Bill From)</strong>, including Logo, Signature, Seal, and Payment Info, as the default for all future invoices.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button onClick={() => setShowSettings(false)} className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded">Cancel</button>
+              <button onClick={() => { onSaveSettings(); setShowSettings(false); }} className="px-4 py-2 text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-700 rounded flex items-center gap-2">
+                 <Save className="w-4 h-4" /> Save Defaults
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Header Actions */}
+      <div className="flex justify-between items-center mb-6 flex-wrap gap-2">
+        <h2 className="text-xl font-bold text-slate-800">Edit Details</h2>
+        <div className="flex gap-2">
+            <button onClick={() => setShowSettings(true)} className="p-2 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded" title="Settings">
+               <Settings className="w-5 h-5" />
+            </button>
+            <label className="flex items-center gap-2 px-3 py-2 bg-indigo-600 text-white rounded-md text-sm font-medium cursor-pointer hover:bg-indigo-700 transition-colors shadow-sm">
+                {isAnalyzing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                <span className="hidden sm:inline">Auto-Fill</span>
+                <input type="file" accept="image/*" onChange={onImageUpload} className="hidden" disabled={isAnalyzing} />
+            </label>
+        </div>
+      </div>
+
+       {/* Print / Download / Share */}
+       <div className="grid grid-cols-2 gap-2 mb-6">
+          <button onClick={onPrint} className="flex items-center justify-center gap-2 px-3 py-2 bg-slate-800 text-white rounded-md text-sm font-medium hover:bg-slate-900 transition-colors shadow-sm">
+                <Printer className="w-4 h-4" /> Print
+          </button>
+          <button onClick={onDownloadPDF} className="flex items-center justify-center gap-2 px-3 py-2 bg-red-600 text-white rounded-md text-sm font-medium hover:bg-red-700 transition-colors shadow-sm">
+                <Download className="w-4 h-4" /> Save PDF
+          </button>
+          <button onClick={shareViaWhatsApp} className="flex items-center justify-center gap-2 px-3 py-2 bg-green-600 text-white rounded-md text-sm font-medium hover:bg-green-700 transition-colors shadow-sm">
+              <MessageCircle className="w-4 h-4" /> WhatsApp
+          </button>
+          <button onClick={shareViaEmail} className="flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 transition-colors shadow-sm">
+              <Mail className="w-4 h-4" /> Email
+          </button>
+      </div>
+
+      <div className="space-y-8">
+        
+        {/* Document Settings */}
+        <section className="bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
+            <div className="flex gap-4 items-end">
+                <div className="flex-1">
+                    <label className="block text-xs font-medium text-slate-500 mb-1">Document Type</label>
+                    <select 
+                        value={data.details.documentTitle} 
+                        onChange={(e) => handleDetailsChange('documentTitle', e.target.value)}
+                        className="w-full p-2 border rounded text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
+                    >
+                        <option value="TAX INVOICE">Tax Invoice</option>
+                        <option value="QUOTATION">Quotation</option>
+                        <option value="ESTIMATE">Estimate</option>
+                        <option value="PROFORMA INVOICE">Proforma Invoice</option>
+                        <option value="BILL OF SUPPLY">Bill of Supply</option>
+                    </select>
+                </div>
+                <div className="flex-1">
+                    <label className="block text-xs font-medium text-slate-500 mb-1">Invoice / Ref No.</label>
+                    <input type="text" value={data.details.number} onChange={e => handleDetailsChange('number', e.target.value)} className="w-full p-2 border rounded text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
+                </div>
+            </div>
+             <div className="grid grid-cols-2 gap-3 mt-3">
+                <div>
+                     <label className="block text-xs font-medium text-slate-500 mb-1">Date</label>
+                     <input type="date" value={data.details.date} onChange={e => handleDetailsChange('date', e.target.value)} className="w-full p-2 border rounded text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
+                </div>
+                 <div>
+                     <label className="block text-xs font-medium text-slate-500 mb-1">Due Date</label>
+                     <input type="date" value={data.details.dueDate} onChange={e => handleDetailsChange('dueDate', e.target.value)} className="w-full p-2 border rounded text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
+                </div>
+             </div>
+        </section>
+
+        {/* Template Selection */}
+        <section>
+          <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-3">Select Template</h3>
+          <div className="grid grid-cols-5 gap-2">
+            {[1, 2, 3, 4, 5].map((id) => (
+              <button
+                key={id}
+                onClick={() => setTemplate(id)}
+                className={`h-10 rounded-md border text-xs font-medium transition-all ${
+                  selectedTemplate === id 
+                  ? 'border-indigo-600 bg-indigo-50 text-indigo-700 shadow-sm' 
+                  : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                }`}
+              >
+                Style {id}
+              </button>
+            ))}
+          </div>
+        </section>
+
+        {/* Company Details */}
+        <section className="bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
+          <h3 className="text-sm font-semibold text-slate-800 mb-4 flex items-center gap-2">
+            Company Details (Bill From)
+          </h3>
+          <div className="grid gap-3">
+             <div className="grid grid-cols-2 gap-3">
+                <div className="col-span-2">
+                    <label className="block text-xs font-medium text-slate-500 mb-1">Company Name</label>
+                    <input type="text" value={data.company.name} onChange={e => handleCompanyChange('name', e.target.value)} className="w-full p-2 border rounded text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
+                </div>
+                <div>
+                     <label className="block text-xs font-medium text-slate-500 mb-1">GSTIN</label>
+                     <input type="text" value={data.company.gstin} onChange={e => handleCompanyChange('gstin', e.target.value)} className="w-full p-2 border rounded text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
+                </div>
+                <div>
+                     <label className="block text-xs font-medium text-slate-500 mb-1">UPI ID (For QR)</label>
+                     <input type="text" value={data.company.upiId || ''} onChange={e => handleCompanyChange('upiId', e.target.value)} className="w-full p-2 border rounded text-sm focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="example@upi" />
+                </div>
+             </div>
+             <div>
+                <label className="block text-xs font-medium text-slate-500 mb-1">Address</label>
+                <textarea rows={2} value={data.company.address} onChange={e => handleCompanyChange('address', e.target.value)} className="w-full p-2 border rounded text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
+             </div>
+             <div className="grid grid-cols-2 gap-3">
+                 <input type="email" placeholder="Email" value={data.company.email} onChange={e => handleCompanyChange('email', e.target.value)} className="w-full p-2 border rounded text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
+                 <input type="text" placeholder="Phone" value={data.company.phone} onChange={e => handleCompanyChange('phone', e.target.value)} className="w-full p-2 border rounded text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
+             </div>
+             
+             {/* Uploads */}
+             <div className="grid grid-cols-3 gap-2 mt-2">
+                <label className="flex flex-col items-center justify-center p-2 border border-dashed rounded cursor-pointer hover:bg-slate-50 transition-colors">
+                    <Upload className="w-4 h-4 text-slate-400 mb-1" />
+                    <span className="text-[10px] text-slate-500">Logo</span>
+                    <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, 'logoUrl')} />
+                </label>
+                <label className="flex flex-col items-center justify-center p-2 border border-dashed rounded cursor-pointer hover:bg-slate-50 transition-colors">
+                    <Upload className="w-4 h-4 text-slate-400 mb-1" />
+                    <span className="text-[10px] text-slate-500">Signature</span>
+                    <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, 'signatureUrl')} />
+                </label>
+                 <label className="flex flex-col items-center justify-center p-2 border border-dashed rounded cursor-pointer hover:bg-slate-50 transition-colors">
+                    <Upload className="w-4 h-4 text-slate-400 mb-1" />
+                    <span className="text-[10px] text-slate-500">Seal</span>
+                    <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, 'sealUrl')} />
+                </label>
+             </div>
+          </div>
+        </section>
+
+        {/* Client Details */}
+        <section className="bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
+          <h3 className="text-sm font-semibold text-slate-800 mb-4">Client Details (Bill To)</h3>
+          <div className="grid gap-3">
+             <input type="text" placeholder="Client / Company Name" value={data.client.companyName} onChange={e => handleClientChange('companyName', e.target.value)} className="w-full p-2 border rounded text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
+             <input type="text" placeholder="GSTIN" value={data.client.gstin} onChange={e => handleClientChange('gstin', e.target.value)} className="w-full p-2 border rounded text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
+             <textarea rows={2} placeholder="Address" value={data.client.address} onChange={e => handleClientChange('address', e.target.value)} className="w-full p-2 border rounded text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
+             <input type="email" placeholder="Email (for sharing)" value={data.client.email} onChange={e => handleClientChange('email', e.target.value)} className="w-full p-2 border rounded text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
+          </div>
+        </section>
+
+        {/* Additional Info */}
+        <section className="bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
+             <div>
+                 <label className="block text-xs font-medium text-slate-500 mb-1">Terms & Conditions</label>
+                 <textarea rows={4} value={data.details.terms} onChange={e => handleDetailsChange('terms', e.target.value)} className="w-full p-2 border rounded text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
+             </div>
+        </section>
+
+        {/* Line Items */}
+        <section className="bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
+           <h3 className="text-sm font-semibold text-slate-800 mb-4">Items</h3>
+           <div className="space-y-3">
+              {data.items.map((item, index) => (
+                  <div key={item.id} className="flex gap-2 items-start bg-slate-50 p-3 rounded border border-slate-100 group hover:border-indigo-100 transition-colors">
+                      <div className="flex-grow grid grid-cols-12 gap-2">
+                          <div className="col-span-12 mb-1 md:mb-0 md:col-span-5">
+                             <input 
+                                className="w-full p-1.5 text-sm border rounded focus:ring-1 focus:ring-indigo-500 outline-none" 
+                                placeholder="Description" 
+                                value={item.description} 
+                                onChange={(e) => updateItem(index, 'description', e.target.value)} 
+                             />
+                          </div>
+                          <div className="col-span-6 md:col-span-2">
+                             <input 
+                                className="w-full p-1.5 text-sm border rounded focus:ring-1 focus:ring-indigo-500 outline-none" 
+                                placeholder="HSN" 
+                                value={item.hsn} 
+                                onChange={(e) => updateItem(index, 'hsn', e.target.value)} 
+                             />
+                          </div>
+                          <div className="col-span-6 md:col-span-2">
+                             <input 
+                                className="w-full p-1.5 text-sm border rounded focus:ring-1 focus:ring-indigo-500 outline-none" 
+                                type="number" 
+                                placeholder="Qty" 
+                                value={item.quantity} 
+                                onChange={(e) => updateItem(index, 'quantity', parseFloat(e.target.value) || 0)} 
+                             />
+                          </div>
+                          <div className="col-span-6 md:col-span-3">
+                             <input 
+                                className="w-full p-1.5 text-sm border rounded focus:ring-1 focus:ring-indigo-500 outline-none" 
+                                type="number" 
+                                placeholder="Price" 
+                                value={item.price} 
+                                onChange={(e) => updateItem(index, 'price', parseFloat(e.target.value) || 0)} 
+                             />
+                          </div>
+                          <div className="col-span-6 md:col-span-12 flex items-center gap-1 mt-1">
+                              <span className="text-[10px] text-slate-500 whitespace-nowrap">GST%</span>
+                              <input 
+                                className="w-20 p-1.5 text-sm border rounded focus:ring-1 focus:ring-indigo-500 outline-none" 
+                                type="number" 
+                                value={item.gstRate} 
+                                onChange={(e) => updateItem(index, 'gstRate', parseFloat(e.target.value) || 0)} 
+                              />
+                          </div>
+                      </div>
+                      <div className="flex flex-col gap-1">
+                         <button onClick={() => removeItem(index)} className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded" title="Delete">
+                            <Trash2 className="w-4 h-4" />
+                         </button>
+                         <button onClick={() => duplicateItem(index)} className="p-1.5 text-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 rounded" title="Duplicate">
+                            <Copy className="w-4 h-4" />
+                         </button>
+                      </div>
+                  </div>
+              ))}
+              <button onClick={addItem} className="w-full py-2.5 border-2 border-dashed border-slate-300 text-slate-500 rounded hover:border-indigo-500 hover:text-indigo-600 hover:bg-indigo-50 flex justify-center items-center gap-2 text-sm font-medium transition-all">
+                  <Plus className="w-4 h-4" /> Add Item
+              </button>
+           </div>
+        </section>
+
+      </div>
+    </div>
+  );
+};

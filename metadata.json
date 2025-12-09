@@ -1,0 +1,5 @@
+{
+  "name": "Smart GST Invoice Generator",
+  "description": "A professional invoice generator with 5 templates, AI-powered autofill from images, and support for GST/HSN codes.",
+  "requestFramePermissions": []
+}
