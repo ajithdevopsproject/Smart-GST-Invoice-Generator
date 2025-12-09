@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { InvoiceData, LineItem, TemplateStyle } from '../types';
-import { Plus, Trash2, Upload, Loader2, Sparkles, Printer, Copy, Share2, Mail, MessageCircle, Download, FileText, Settings, Save } from 'lucide-react';
+import { Plus, Trash2, Upload, Loader2, Sparkles, Printer, Copy, Share2, Mail, MessageCircle, Download, FileText, Settings, Save, AlignLeft, AlignCenter, AlignRight, X, Image as ImageIcon } from 'lucide-react';
 
 interface Props {
   data: InvoiceData;
@@ -12,15 +12,16 @@ interface Props {
   onPrint: () => void;
   onDownloadPDF: () => void;
   onSaveSettings: () => void;
+  onWhatsAppShare: () => void;
 }
 
 export const InvoiceForm: React.FC<Props> = ({ 
-  data, setData, selectedTemplate, setTemplate, onImageUpload, isAnalyzing, onPrint, onDownloadPDF, onSaveSettings
+  data, setData, selectedTemplate, setTemplate, onImageUpload, isAnalyzing, onPrint, onDownloadPDF, onSaveSettings, onWhatsAppShare
 }) => {
   
   const [showSettings, setShowSettings] = useState(false);
 
-  const handleCompanyChange = (field: string, value: string) => {
+  const handleCompanyChange = (field: string, value: string | null) => {
     setData(prev => ({ ...prev, company: { ...prev.company, [field]: value } }));
   };
 
@@ -66,6 +67,10 @@ export const InvoiceForm: React.FC<Props> = ({
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, field: 'logoUrl' | 'signatureUrl' | 'sealUrl') => {
     const file = e.target.files?.[0];
     if (file) {
+      if (file.size > 2 * 1024 * 1024) {
+          alert("Image is too large. Please upload an image smaller than 2MB.");
+          return;
+      }
       const reader = new FileReader();
       reader.onloadend = () => {
         handleCompanyChange(field, reader.result as string);
@@ -74,10 +79,9 @@ export const InvoiceForm: React.FC<Props> = ({
     }
   };
 
-  const shareViaWhatsApp = () => {
-    const text = `*${data.details.documentTitle}*\nFrom: ${data.company.name}\nTo: ${data.client.companyName || data.client.name}\nInvoice No: ${data.details.number}\n\n*Total Amount: ₹${data.items.reduce((acc, item) => acc + (item.quantity * item.price) + ((item.quantity * item.price * item.gstRate)/100), 0).toFixed(2)}*\n\n(Please download the attached PDF for full details)`;
-    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
-  };
+  const removeImage = (field: 'logoUrl' | 'signatureUrl' | 'sealUrl') => {
+      handleCompanyChange(field, null);
+  }
 
   const shareViaEmail = () => {
     const subject = `${data.details.documentTitle} - ${data.details.number} from ${data.company.name}`;
@@ -96,7 +100,10 @@ export const InvoiceForm: React.FC<Props> = ({
               <Settings className="w-5 h-5 text-indigo-600" /> Default Settings
             </h3>
             <p className="text-sm text-slate-500 mb-4">
-              Clicking "Save Defaults" will save the current <strong>Company Details (Bill From)</strong>, including Logo, Signature, Seal, and Payment Info, as the default for all future invoices.
+              Clicking "Save Defaults" will save the current <strong>Company Details (Bill From)</strong>, including the uploaded Logo, Signature, and Seal, to your browser. These will automatically load next time you open the app.
+            </p>
+            <p className="text-xs text-orange-600 mb-4 bg-orange-50 p-2 rounded">
+                Note: Browser storage is limited. Use small file size images for best results.
             </p>
             <div className="flex justify-end gap-3">
               <button onClick={() => setShowSettings(false)} className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded">Cancel</button>
@@ -112,12 +119,12 @@ export const InvoiceForm: React.FC<Props> = ({
       <div className="flex justify-between items-center mb-6 flex-wrap gap-2">
         <h2 className="text-xl font-bold text-slate-800">Edit Details</h2>
         <div className="flex gap-2">
-            <button onClick={() => setShowSettings(true)} className="p-2 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded" title="Settings">
+            <button onClick={() => setShowSettings(true)} className="p-2 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded border border-slate-200" title="Save Defaults">
                <Settings className="w-5 h-5" />
             </button>
             <label className="flex items-center gap-2 px-3 py-2 bg-indigo-600 text-white rounded-md text-sm font-medium cursor-pointer hover:bg-indigo-700 transition-colors shadow-sm">
                 {isAnalyzing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                <span className="hidden sm:inline">Auto-Fill</span>
+                <span className="hidden sm:inline">Auto-Fill from Image</span>
                 <input type="file" accept="image/*" onChange={onImageUpload} className="hidden" disabled={isAnalyzing} />
             </label>
         </div>
@@ -131,13 +138,17 @@ export const InvoiceForm: React.FC<Props> = ({
           <button onClick={onDownloadPDF} className="flex items-center justify-center gap-2 px-3 py-2 bg-red-600 text-white rounded-md text-sm font-medium hover:bg-red-700 transition-colors shadow-sm">
                 <Download className="w-4 h-4" /> Save PDF
           </button>
-          <button onClick={shareViaWhatsApp} className="flex items-center justify-center gap-2 px-3 py-2 bg-green-600 text-white rounded-md text-sm font-medium hover:bg-green-700 transition-colors shadow-sm">
+          <button onClick={onWhatsAppShare} className="flex items-center justify-center gap-2 px-3 py-2 bg-green-600 text-white rounded-md text-sm font-medium hover:bg-green-700 transition-colors shadow-sm">
               <MessageCircle className="w-4 h-4" /> WhatsApp
           </button>
           <button onClick={shareViaEmail} className="flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 transition-colors shadow-sm">
               <Mail className="w-4 h-4" /> Email
           </button>
       </div>
+      
+      <p className="text-xs text-slate-400 text-center mb-6">
+         Files are saved to your browser's default Downloads folder.
+      </p>
 
       <div className="space-y-8">
         
@@ -224,23 +235,86 @@ export const InvoiceForm: React.FC<Props> = ({
                  <input type="text" placeholder="Phone" value={data.company.phone} onChange={e => handleCompanyChange('phone', e.target.value)} className="w-full p-2 border rounded text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
              </div>
              
-             {/* Uploads */}
-             <div className="grid grid-cols-3 gap-2 mt-2">
-                <label className="flex flex-col items-center justify-center p-2 border border-dashed rounded cursor-pointer hover:bg-slate-50 transition-colors">
-                    <Upload className="w-4 h-4 text-slate-400 mb-1" />
-                    <span className="text-[10px] text-slate-500">Logo</span>
-                    <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, 'logoUrl')} />
-                </label>
-                <label className="flex flex-col items-center justify-center p-2 border border-dashed rounded cursor-pointer hover:bg-slate-50 transition-colors">
-                    <Upload className="w-4 h-4 text-slate-400 mb-1" />
-                    <span className="text-[10px] text-slate-500">Signature</span>
-                    <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, 'signatureUrl')} />
-                </label>
-                 <label className="flex flex-col items-center justify-center p-2 border border-dashed rounded cursor-pointer hover:bg-slate-50 transition-colors">
-                    <Upload className="w-4 h-4 text-slate-400 mb-1" />
-                    <span className="text-[10px] text-slate-500">Seal</span>
-                    <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, 'sealUrl')} />
-                </label>
+             {/* Uploads & Logo Position */}
+             <div className="mt-4 space-y-4 border-t pt-4">
+                
+                {/* Logo Upload */}
+                <div className="flex gap-4 items-start">
+                    <div className="flex-grow">
+                        <label className="block text-xs font-medium text-slate-500 mb-1">Company Logo</label>
+                         {!data.company.logoUrl ? (
+                            <label className="flex flex-col items-center justify-center p-4 border border-dashed rounded cursor-pointer hover:bg-slate-50 transition-colors bg-white">
+                                <Upload className="w-5 h-5 text-slate-400 mb-1" />
+                                <span className="text-[10px] text-slate-500">Upload Logo</span>
+                                <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, 'logoUrl')} />
+                            </label>
+                         ) : (
+                             <div className="relative border rounded p-2 bg-white flex justify-center">
+                                 <img src={data.company.logoUrl} alt="Logo Preview" className="h-16 object-contain" />
+                                 <button onClick={() => removeImage('logoUrl')} className="absolute -top-2 -right-2 bg-red-100 text-red-600 rounded-full p-1 shadow hover:bg-red-200"><X className="w-3 h-3" /></button>
+                             </div>
+                         )}
+                    </div>
+                    <div className="w-24 shrink-0">
+                         <label className="block text-xs font-medium text-slate-500 mb-1">Position</label>
+                         <div className="flex bg-slate-100 rounded p-1 gap-1">
+                            <button 
+                                onClick={() => handleCompanyChange('logoPosition', 'left')} 
+                                className={`flex-1 flex justify-center py-1 rounded text-xs ${data.company.logoPosition === 'left' ? 'bg-white shadow text-indigo-600' : 'text-slate-500'}`}
+                            >
+                                <AlignLeft className="w-3 h-3" />
+                            </button>
+                            <button 
+                                onClick={() => handleCompanyChange('logoPosition', 'center')} 
+                                className={`flex-1 flex justify-center py-1 rounded text-xs ${data.company.logoPosition === 'center' ? 'bg-white shadow text-indigo-600' : 'text-slate-500'}`}
+                            >
+                                <AlignCenter className="w-3 h-3" />
+                            </button>
+                            <button 
+                                onClick={() => handleCompanyChange('logoPosition', 'right')} 
+                                className={`flex-1 flex justify-center py-1 rounded text-xs ${data.company.logoPosition === 'right' ? 'bg-white shadow text-indigo-600' : 'text-slate-500'}`}
+                            >
+                                <AlignRight className="w-3 h-3" />
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                     {/* Signature Upload */}
+                    <div>
+                        <label className="block text-xs font-medium text-slate-500 mb-1">Authorized Signature</label>
+                        {!data.company.signatureUrl ? (
+                            <label className="flex flex-col items-center justify-center p-4 border border-dashed rounded cursor-pointer hover:bg-slate-50 transition-colors bg-white h-24">
+                                <Upload className="w-5 h-5 text-slate-400 mb-1" />
+                                <span className="text-[10px] text-slate-500">Upload Signature</span>
+                                <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, 'signatureUrl')} />
+                            </label>
+                        ) : (
+                            <div className="relative border rounded p-2 bg-white flex justify-center h-24 items-center">
+                                <img src={data.company.signatureUrl} alt="Signature Preview" className="h-full object-contain" />
+                                <button onClick={() => removeImage('signatureUrl')} className="absolute -top-2 -right-2 bg-red-100 text-red-600 rounded-full p-1 shadow hover:bg-red-200"><X className="w-3 h-3" /></button>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Seal Upload */}
+                    <div>
+                        <label className="block text-xs font-medium text-slate-500 mb-1">Company Seal</label>
+                        {!data.company.sealUrl ? (
+                            <label className="flex flex-col items-center justify-center p-4 border border-dashed rounded cursor-pointer hover:bg-slate-50 transition-colors bg-white h-24">
+                                <Upload className="w-5 h-5 text-slate-400 mb-1" />
+                                <span className="text-[10px] text-slate-500">Upload Seal</span>
+                                <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, 'sealUrl')} />
+                            </label>
+                        ) : (
+                            <div className="relative border rounded p-2 bg-white flex justify-center h-24 items-center">
+                                <img src={data.company.sealUrl} alt="Seal Preview" className="h-full object-contain" />
+                                <button onClick={() => removeImage('sealUrl')} className="absolute -top-2 -right-2 bg-red-100 text-red-600 rounded-full p-1 shadow hover:bg-red-200"><X className="w-3 h-3" /></button>
+                            </div>
+                        )}
+                    </div>
+                </div>
              </div>
           </div>
         </section>
@@ -258,6 +332,10 @@ export const InvoiceForm: React.FC<Props> = ({
 
         {/* Additional Info */}
         <section className="bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
+             <div className="mb-3">
+                 <label className="block text-xs font-medium text-slate-500 mb-1">Payment Terms</label>
+                 <textarea rows={2} value={data.details.paymentTerms} onChange={e => handleDetailsChange('paymentTerms', e.target.value)} className="w-full p-2 border rounded text-sm focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="e.g. Net 30 Days" />
+             </div>
              <div>
                  <label className="block text-xs font-medium text-slate-500 mb-1">Terms & Conditions</label>
                  <textarea rows={4} value={data.details.terms} onChange={e => handleDetailsChange('terms', e.target.value)} className="w-full p-2 border rounded text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />

@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { InvoiceForm } from './components/InvoiceForm';
 import { InvoicePreview } from './components/InvoicePreview';
-import { InvoiceData, TemplateStyle } from './types';
+import { InvoiceData, TemplateStyle, CompanyDetails } from './types';
 import { extractInvoiceData, fileToGenerativePart } from './services/geminiService';
 
 declare const html2pdf: any; // Declare global html2pdf variable
 
-const DEFAULT_COMPANY = {
+const DEFAULT_COMPANY: CompanyDetails = {
   name: "JP NET",
   address: "59/22B, VP Kovil street, pichnoor, Gudiyattam, Vellore, TamilNadu, 632602",
   email: "jpstore.th@gmail.com",
@@ -16,7 +16,8 @@ const DEFAULT_COMPANY = {
   logoUrl: null,
   signatureUrl: null,
   sealUrl: null,
-  upiId: "ajithproteck@icici"
+  upiId: "ajithproteck@icici",
+  logoPosition: 'left'
 };
 
 const INITIAL_DATA: InvoiceData = {
@@ -34,6 +35,7 @@ const INITIAL_DATA: InvoiceData = {
     number: "INV-001",
     date: new Date().toISOString().split('T')[0],
     dueDate: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    paymentTerms: "Net 30 Days",
     notes: "",
     terms: "1. Goods once sold will not be taken back.\n2. Warranty as per manufacturer terms.\n3. Interest @ 24% will be charged if payment is not made within due date.\n4. Subject to 'Gudiyattam' Jurisdiction."
   },
@@ -54,6 +56,8 @@ function App() {
     if (savedCompany) {
         try {
             const parsedCompany = JSON.parse(savedCompany);
+            // Merge defaults but don't overwrite if we have a current draft? 
+            // Actually, usually we want to start with defaults unless we have a specific draft.
             setData(prev => ({ ...prev, company: parsedCompany }));
         } catch(e) { console.error("Error loading company defaults", e); }
     }
@@ -79,11 +83,10 @@ function App() {
     if (savedDraft) {
         try {
             const parsedDraft = JSON.parse(savedDraft);
-            // Merge draft but keep generated number logic if needed, or fully restore.
-            // Let's fully restore but safeguard against empty company if clear
+            // Merge draft
             setData(prev => ({
                  ...parsedDraft,
-                 // Ensure we don't accidentally wipe company if draft was partial? No, draft should be complete.
+                 // Safety check: ensure company name isn't empty if draft was bad
                  company: parsedDraft.company.name ? parsedDraft.company : prev.company
             }));
         } catch(e) { console.error("Error loading draft", e); }
@@ -97,12 +100,20 @@ function App() {
         localStorage.setItem('lastInvoiceNumber', data.details.number);
     }
     // Save current work as draft
-    localStorage.setItem('currentInvoiceDraft', JSON.stringify(data));
+    try {
+        localStorage.setItem('currentInvoiceDraft', JSON.stringify(data));
+    } catch (e) {
+        console.warn("Could not save draft (likely storage full from images)");
+    }
   }, [data]);
 
   const saveCompanyDefaults = () => {
-    localStorage.setItem('defaultCompanyDetails', JSON.stringify(data.company));
-    alert("Company details saved as default!");
+    try {
+        localStorage.setItem('defaultCompanyDetails', JSON.stringify(data.company));
+        alert("Company details, Logo, Signature, and Seal saved as default! They will load automatically next time.");
+    } catch (e) {
+        alert("Could not save defaults. Your images might be too large. Try smaller images.");
+    }
   };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -138,16 +149,18 @@ function App() {
     window.print();
   };
 
-  const handleDownloadPDF = () => {
+  const handleDownloadPDF = (customFilename?: string) => {
     const element = document.getElementById('invoice-content');
     if (!element) return;
+
+    const filename = customFilename || prompt("Enter filename for PDF:", data.details.number) || data.details.number;
 
     // Configuration for html2pdf
     const opt = {
       margin:       0,
-      filename:     `${data.details.number}.pdf`,
+      filename:     `${filename}.pdf`,
       image:        { type: 'jpeg', quality: 0.98 },
-      html2canvas:  { scale: 2, useCORS: true },
+      html2canvas:  { scale: 2, useCORS: true, scrollY: 0 },
       jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
     };
 
@@ -159,8 +172,21 @@ function App() {
     }
   };
 
+  const handleWhatsAppShare = () => {
+    // 1. Trigger PDF download
+    handleDownloadPDF(data.details.number); // Auto-download without prompt for smooth UX
+
+    const text = `*${data.details.documentTitle}*\nFrom: ${data.company.name}\nTo: ${data.client.companyName || data.client.name}\nInvoice No: ${data.details.number}\n\n*Total Amount: ₹${data.items.reduce((acc, item) => acc + (item.quantity * item.price) + ((item.quantity * item.price * item.gstRate)/100), 0).toFixed(2)}*\n\n(Please download the attached PDF for full details)`;
+    
+    // 2. Open WhatsApp after a short delay to allow download to start
+    setTimeout(() => {
+        alert("PDF Downloaded! Please attach it to the WhatsApp chat that opens.");
+        window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+    }, 1500);
+  };
+
   return (
-    <div className="flex flex-col md:flex-row h-screen w-full bg-slate-100 text-slate-900 print:h-auto print:overflow-visible">
+    <div className="flex flex-col md:flex-row h-screen w-full bg-slate-100 text-slate-900 print:h-auto print:overflow-visible print:block">
       {/* Sidebar / Editor - Hidden on Print */}
       <div className="w-full md:w-[450px] lg:w-[500px] h-full flex-shrink-0 z-20 shadow-xl bg-white no-print overflow-y-auto">
         <InvoiceForm 
@@ -171,15 +197,16 @@ function App() {
           onImageUpload={handleImageUpload}
           isAnalyzing={isAnalyzing}
           onPrint={handlePrint}
-          onDownloadPDF={handleDownloadPDF}
+          onDownloadPDF={() => handleDownloadPDF()}
           onSaveSettings={saveCompanyDefaults}
+          onWhatsAppShare={handleWhatsAppShare}
         />
       </div>
 
       {/* Preview Area */}
-      <div className="flex-grow h-full overflow-auto bg-slate-500 p-4 md:p-8 flex justify-center print:p-0 print:bg-white print:overflow-visible print:block print:h-auto">
+      <div className="flex-grow h-full overflow-auto bg-slate-500 p-4 md:p-8 flex justify-center print:p-0 print:bg-white print:overflow-visible print:block print:h-auto print:w-full">
          {/* Paper Sheet Simulation */}
-         <div id="invoice-preview-container" className="bg-white shadow-2xl w-full max-w-[210mm] min-h-[297mm] print:shadow-none print:w-full print:max-w-none print:min-h-0">
+         <div id="invoice-preview-container" className="bg-white shadow-2xl w-full max-w-[210mm] min-h-[297mm] print:shadow-none print:w-full print:max-w-none print:min-h-0 print:absolute print:top-0 print:left-0">
             <InvoicePreview data={data} template={template} />
          </div>
       </div>

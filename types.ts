@@ -18,6 +18,7 @@ export interface CompanyDetails {
   signatureUrl: string | null;
   sealUrl: string | null;
   upiId?: string;
+  logoPosition?: 'left' | 'right' | 'center';
 }
 
 export interface ClientDetails {
@@ -34,6 +35,7 @@ export interface InvoiceDetails {
   number: string;
   date: string;
   dueDate: string;
+  paymentTerms: string;
   notes: string;
   terms: string;
 }
