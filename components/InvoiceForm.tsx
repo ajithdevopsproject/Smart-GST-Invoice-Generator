@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { InvoiceData, LineItem, TemplateStyle } from '../types';
-import { Plus, Trash2, Upload, Loader2, Sparkles, Printer, Copy, Share2, Mail, MessageCircle, Download, FileText, Settings, Save, AlignLeft, AlignCenter, AlignRight, X, Image as ImageIcon } from 'lucide-react';
+import { Plus, Trash2, Upload, Loader2, Sparkles, Printer, Copy, Share2, Mail, MessageCircle, Download, Save, AlignLeft, AlignCenter, AlignRight, X } from 'lucide-react';
 
 interface Props {
   data: InvoiceData;
@@ -13,14 +13,13 @@ interface Props {
   onDownloadPDF: () => void;
   onSaveSettings: () => void;
   onWhatsAppShare: () => void;
+  onEmailShare: () => void;
 }
 
 export const InvoiceForm: React.FC<Props> = ({ 
-  data, setData, selectedTemplate, setTemplate, onImageUpload, isAnalyzing, onPrint, onDownloadPDF, onSaveSettings, onWhatsAppShare
+  data, setData, selectedTemplate, setTemplate, onImageUpload, isAnalyzing, onPrint, onDownloadPDF, onSaveSettings, onWhatsAppShare, onEmailShare
 }) => {
   
-  const [showSettings, setShowSettings] = useState(false);
-
   const handleCompanyChange = (field: string, value: string | null) => {
     setData(prev => ({ ...prev, company: { ...prev.company, [field]: value } }));
   };
@@ -83,48 +82,23 @@ export const InvoiceForm: React.FC<Props> = ({
       handleCompanyChange(field, null);
   }
 
-  const shareViaEmail = () => {
-    const subject = `${data.details.documentTitle} - ${data.details.number} from ${data.company.name}`;
-    const body = `Dear Customer,\n\nPlease find attached the ${data.details.documentTitle} details.\n\nDocument Number: ${data.details.number}\nTotal Amount: ₹${data.items.reduce((acc, item) => acc + (item.quantity * item.price) + ((item.quantity * item.price * item.gstRate)/100), 0).toFixed(2)}\n\n(Please attach the downloaded PDF manually)\n\nThank you,\n${data.company.name}`;
-    window.location.href = `mailto:${data.client.email || ''}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-  };
-
   return (
     <div className="h-full p-6 bg-slate-50 border-r border-slate-200 relative">
       
-      {/* Settings Modal Overlay */}
-      {showSettings && (
-        <div className="absolute inset-0 z-50 bg-slate-900/50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
-            <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
-              <Settings className="w-5 h-5 text-indigo-600" /> Default Settings
-            </h3>
-            <p className="text-sm text-slate-500 mb-4">
-              Clicking "Save Defaults" will save the current <strong>Company Details (Bill From)</strong>, including the uploaded Logo, Signature, and Seal, to your browser. These will automatically load next time you open the app.
-            </p>
-            <p className="text-xs text-orange-600 mb-4 bg-orange-50 p-2 rounded">
-                Note: Browser storage is limited. Use small file size images for best results.
-            </p>
-            <div className="flex justify-end gap-3">
-              <button onClick={() => setShowSettings(false)} className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded">Cancel</button>
-              <button onClick={() => { onSaveSettings(); setShowSettings(false); }} className="px-4 py-2 text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-700 rounded flex items-center gap-2">
-                 <Save className="w-4 h-4" /> Save Defaults
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Header Actions */}
       <div className="flex justify-between items-center mb-6 flex-wrap gap-2">
         <h2 className="text-xl font-bold text-slate-800">Edit Details</h2>
         <div className="flex gap-2">
-            <button onClick={() => setShowSettings(true)} className="p-2 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded border border-slate-200" title="Save Defaults">
-               <Settings className="w-5 h-5" />
+            <button 
+                onClick={onSaveSettings} 
+                className="px-3 py-2 text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-md text-sm font-medium border border-indigo-200 flex items-center gap-2 transition-colors"
+                title="Save current details (including Logo, Sig, Seal) as defaults for future use"
+            >
+               <Save className="w-4 h-4" /> Save Defaults
             </button>
             <label className="flex items-center gap-2 px-3 py-2 bg-indigo-600 text-white rounded-md text-sm font-medium cursor-pointer hover:bg-indigo-700 transition-colors shadow-sm">
                 {isAnalyzing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                <span className="hidden sm:inline">Auto-Fill from Image</span>
+                <span className="hidden sm:inline">Auto-Fill</span>
                 <input type="file" accept="image/*" onChange={onImageUpload} className="hidden" disabled={isAnalyzing} />
             </label>
         </div>
@@ -141,13 +115,14 @@ export const InvoiceForm: React.FC<Props> = ({
           <button onClick={onWhatsAppShare} className="flex items-center justify-center gap-2 px-3 py-2 bg-green-600 text-white rounded-md text-sm font-medium hover:bg-green-700 transition-colors shadow-sm">
               <MessageCircle className="w-4 h-4" /> WhatsApp
           </button>
-          <button onClick={shareViaEmail} className="flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 transition-colors shadow-sm">
+          <button onClick={onEmailShare} className="flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 transition-colors shadow-sm">
               <Mail className="w-4 h-4" /> Email
           </button>
       </div>
       
       <p className="text-xs text-slate-400 text-center mb-6">
-         Files are saved to your browser's default Downloads folder.
+         <strong>Mobile:</strong> Attaches PDF automatically.<br/>
+         <strong>Desktop:</strong> Downloads PDF, then you attach it.
       </p>
 
       <div className="space-y-8">

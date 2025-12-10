@@ -108,11 +108,14 @@ function App() {
   }, [data]);
 
   const saveCompanyDefaults = () => {
+    const confirmSave = window.confirm("Do you want to save the current Company Details, Logo, Signature, and Seal as your default settings? This will overwrite previous defaults.");
+    if (!confirmSave) return;
+
     try {
         localStorage.setItem('defaultCompanyDetails', JSON.stringify(data.company));
-        alert("Company details, Logo, Signature, and Seal saved as default! They will load automatically next time.");
+        alert("Success! Your company details and images have been saved as defaults.");
     } catch (e) {
-        alert("Could not save defaults. Your images might be too large. Try smaller images.");
+        alert("Error: Storage limit exceeded. Please try using smaller images (compress them) for Logo/Signature/Seal.");
     }
   };
 
@@ -149,13 +152,30 @@ function App() {
     window.print();
   };
 
+  // Helper: Generate Blob for sharing
+  const generatePdfBlob = async (): Promise<Blob | null> => {
+      const element = document.getElementById('invoice-content');
+      if (!element) return null;
+      const opt = {
+        margin: 0,
+        filename: `${data.details.number}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true, scrollY: 0 },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      };
+      
+      if (typeof html2pdf !== 'undefined') {
+          return html2pdf().set(opt).from(element).output('blob');
+      }
+      return null;
+  }
+
   const handleDownloadPDF = (customFilename?: string) => {
     const element = document.getElementById('invoice-content');
     if (!element) return;
 
     const filename = customFilename || prompt("Enter filename for PDF:", data.details.number) || data.details.number;
 
-    // Configuration for html2pdf
     const opt = {
       margin:       0,
       filename:     `${filename}.pdf`,
@@ -164,7 +184,6 @@ function App() {
       jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
     };
 
-    // Use html2pdf library
     if (typeof html2pdf !== 'undefined') {
         html2pdf().set(opt).from(element).save();
     } else {
@@ -172,18 +191,56 @@ function App() {
     }
   };
 
-  const handleWhatsAppShare = () => {
-    // 1. Trigger PDF download
-    handleDownloadPDF(data.details.number); // Auto-download without prompt for smooth UX
+  // Unified Share Handler
+  const handleShare = async (platform: 'whatsapp' | 'email') => {
+      const blob = await generatePdfBlob();
+      if (!blob) {
+          alert("Could not generate PDF. Please try again.");
+          return;
+      }
 
-    const text = `*${data.details.documentTitle}*\nFrom: ${data.company.name}\nTo: ${data.client.companyName || data.client.name}\nInvoice No: ${data.details.number}\n\n*Total Amount: ₹${data.items.reduce((acc, item) => acc + (item.quantity * item.price) + ((item.quantity * item.price * item.gstRate)/100), 0).toFixed(2)}*\n\n(Please download the attached PDF for full details)`;
-    
-    // 2. Open WhatsApp after a short delay to allow download to start
-    setTimeout(() => {
-        alert("PDF Downloaded! Please attach it to the WhatsApp chat that opens.");
-        window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
-    }, 1500);
-  };
+      const file = new File([blob], `${data.details.number}.pdf`, { type: 'application/pdf' });
+      const shareData = {
+          title: data.details.documentTitle,
+          text: `Invoice ${data.details.number} from ${data.company.name}`,
+          files: [file]
+      };
+
+      // 1. Try Native Web Share API (Works on Mobile for Auto-Attach)
+      if (navigator.canShare && navigator.canShare(shareData)) {
+          try {
+              await navigator.share(shareData);
+              return; // Success
+          } catch (err) {
+              console.log('Native share cancelled or failed', err);
+              // Fallthrough to fallback
+          }
+      }
+
+      // 2. Desktop Fallback (Download + Open App)
+      // Save file locally first
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${data.details.number}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      // Open App with pre-filled text
+      setTimeout(() => {
+          if (platform === 'whatsapp') {
+               const text = `*${data.details.documentTitle}*\nFrom: ${data.company.name}\nTo: ${data.client.companyName || data.client.name}\nInvoice No: ${data.details.number}\n\n*Total Amount: ₹${data.items.reduce((acc, item) => acc + (item.quantity * item.price) + ((item.quantity * item.price * item.gstRate)/100), 0).toFixed(2)}*\n\n(Please attach the downloaded PDF file)`;
+               window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+          } else {
+               const subject = `${data.details.documentTitle} - ${data.details.number} from ${data.company.name}`;
+               const body = `Dear Customer,\n\nPlease find attached the ${data.details.documentTitle}.\n\n(Please attach the downloaded file manually)\n\nThank you,\n${data.company.name}`;
+               window.location.href = `mailto:${data.client.email || ''}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+          }
+          alert(`PDF Downloaded.\n\nPlease drag and drop the downloaded file into ${platform === 'whatsapp' ? 'WhatsApp' : 'your Email'}.`);
+      }, 500);
+  }
 
   return (
     <div className="flex flex-col md:flex-row h-screen w-full bg-slate-100 text-slate-900 print:h-auto print:overflow-visible print:block">
@@ -199,7 +256,8 @@ function App() {
           onPrint={handlePrint}
           onDownloadPDF={() => handleDownloadPDF()}
           onSaveSettings={saveCompanyDefaults}
-          onWhatsAppShare={handleWhatsAppShare}
+          onWhatsAppShare={() => handleShare('whatsapp')}
+          onEmailShare={() => handleShare('email')}
         />
       </div>
 
