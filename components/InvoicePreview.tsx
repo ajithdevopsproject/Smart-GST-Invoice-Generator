@@ -74,8 +74,10 @@ export const InvoicePreview: React.FC<Props> = ({ data, template }) => {
   const amountInWords = numberToWords(totalAmount);
 
   // Generate QR Code URL if UPI ID exists
+  // Using QuickChart for reliable CORS support and uptime
+  const upiLink = `upi://pay?pa=${company.upiId}&pn=${encodeURIComponent(company.name)}${totalAmount > 0 ? `&am=${totalAmount.toFixed(2)}` : ''}&cu=INR`;
   const qrCodeUrl = company.upiId 
-    ? `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`upi://pay?pa=${company.upiId}&pn=${encodeURIComponent(company.name)}&am=${totalAmount.toFixed(2)}&cu=INR`)}`
+    ? `https://quickchart.io/qr?text=${encodeURIComponent(upiLink)}&size=150&margin=0`
     : null;
 
 
@@ -103,7 +105,7 @@ export const InvoicePreview: React.FC<Props> = ({ data, template }) => {
   const PaymentQRCode = ({ className }: { className?: string }) => (
     company.upiId && qrCodeUrl ? (
       <div className={`flex flex-col items-center justify-center p-2 border border-slate-200 rounded bg-white ${className}`}>
-        <img src={qrCodeUrl} alt="Payment QR" className="w-20 h-20 mb-1" />
+        <img src={qrCodeUrl} alt="Payment QR" className="w-20 h-20 mb-1" crossOrigin="anonymous" />
         <p className="text-[9px] text-slate-500">Scan to Pay</p>
         <p className="text-[9px] font-mono font-bold">{company.upiId}</p>
       </div>

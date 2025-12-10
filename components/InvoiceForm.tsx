@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { InvoiceData, LineItem, TemplateStyle } from '../types';
-import { Plus, Trash2, Upload, Loader2, Sparkles, Printer, Copy, Share2, Mail, MessageCircle, Download, Save, AlignLeft, AlignCenter, AlignRight, X } from 'lucide-react';
+import { Plus, Trash2, Upload, Loader2, Sparkles, Printer, Copy, Share2, Mail, MessageCircle, Download, Save, AlignLeft, AlignCenter, AlignRight, X, FilePlus } from 'lucide-react';
 
 interface Props {
   data: InvoiceData;
@@ -14,10 +14,11 @@ interface Props {
   onSaveSettings: () => void;
   onWhatsAppShare: () => void;
   onEmailShare: () => void;
+  onSaveAndNew: () => void;
 }
 
 export const InvoiceForm: React.FC<Props> = ({ 
-  data, setData, selectedTemplate, setTemplate, onImageUpload, isAnalyzing, onPrint, onDownloadPDF, onSaveSettings, onWhatsAppShare, onEmailShare
+  data, setData, selectedTemplate, setTemplate, onImageUpload, isAnalyzing, onPrint, onDownloadPDF, onSaveSettings, onWhatsAppShare, onEmailShare, onSaveAndNew
 }) => {
   
   const handleCompanyChange = (field: string, value: string | null) => {
@@ -43,7 +44,7 @@ export const InvoiceForm: React.FC<Props> = ({
       ...prev,
       items: [
         ...prev.items,
-        { id: Math.random().toString(), description: 'New Item', hsn: '', quantity: 1, price: 0, gstRate: 18 }
+        { id: Math.random().toString(), description: '', hsn: '', quantity: 1, price: 0, gstRate: 18 }
       ]
     }));
   };
@@ -106,6 +107,9 @@ export const InvoiceForm: React.FC<Props> = ({
 
        {/* Print / Download / Share */}
        <div className="grid grid-cols-2 gap-2 mb-6">
+          <button onClick={onSaveAndNew} className="col-span-2 flex items-center justify-center gap-2 px-3 py-2 bg-emerald-600 text-white rounded-md text-sm font-medium hover:bg-emerald-700 transition-colors shadow-sm">
+                <FilePlus className="w-4 h-4" /> Save & New Invoice
+          </button>
           <button onClick={onPrint} className="flex items-center justify-center gap-2 px-3 py-2 bg-slate-800 text-white rounded-md text-sm font-medium hover:bg-slate-900 transition-colors shadow-sm">
                 <Printer className="w-4 h-4" /> Print
           </button>

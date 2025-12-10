@@ -95,10 +95,6 @@ function App() {
 
   // Save State to LocalStorage on Change
   useEffect(() => {
-    // Save Invoice Number to track increment
-    if (data.details.number) {
-        localStorage.setItem('lastInvoiceNumber', data.details.number);
-    }
     // Save current work as draft
     try {
         localStorage.setItem('currentInvoiceDraft', JSON.stringify(data));
@@ -117,6 +113,51 @@ function App() {
     } catch (e) {
         alert("Error: Storage limit exceeded. Please try using smaller images (compress them) for Logo/Signature/Seal.");
     }
+  };
+
+  const handleSaveAndNew = () => {
+    // 1. Save to History (LocalStorage)
+    try {
+      const history = JSON.parse(localStorage.getItem('invoiceHistory') || '[]');
+      history.push({ ...data, timestamp: new Date().toISOString() });
+      localStorage.setItem('invoiceHistory', JSON.stringify(history));
+    } catch(e) {
+      console.warn("Could not save to history due to storage limit");
+    }
+
+    // 2. Save current Invoice Number as Last Used
+    localStorage.setItem('lastInvoiceNumber', data.details.number);
+
+    // 3. Calculate Next Invoice Number
+    let nextNumber = "INV-001";
+    const currentNumStr = data.details.number;
+    const numPart = parseInt(currentNumStr.replace(/\D/g, ''));
+    if (!isNaN(numPart)) {
+         const prefix = currentNumStr.replace(/[0-9]/g, '');
+         const nextVal = numPart + 1;
+         // Detect padding length
+         const numberMatch = currentNumStr.match(/\d+$/);
+         const padLen = numberMatch ? numberMatch[0].length : 3;
+         nextNumber = prefix + nextVal.toString().padStart(padLen, '0');
+    }
+
+    // 4. Reset Form (Keep Company, Reset Client & Items)
+    setData(prev => ({
+        company: prev.company, // Preserve company details
+        client: { ...INITIAL_DATA.client, name: "", companyName: "", address: "", gstin: "", email: "", phone: "" }, // Reset Client
+        items: [ { id: Math.random().toString(), description: '', hsn: '', quantity: 1, price: 0, gstRate: 18 } ], // Reset Items
+        details: {
+            ...INITIAL_DATA.details,
+            number: nextNumber, // Set new number
+            date: new Date().toISOString().split('T')[0],
+            dueDate: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        }
+    }));
+
+    // Clear the current draft logic so it doesn't reload the old one on refresh immediately
+    localStorage.removeItem('currentInvoiceDraft');
+    
+    alert(`Invoice Saved! Form cleared. New Invoice Number: ${nextNumber}`);
   };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -258,6 +299,7 @@ function App() {
           onSaveSettings={saveCompanyDefaults}
           onWhatsAppShare={() => handleShare('whatsapp')}
           onEmailShare={() => handleShare('email')}
+          onSaveAndNew={handleSaveAndNew}
         />
       </div>
 
